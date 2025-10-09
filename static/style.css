@@ -1,0 +1,8 @@
+:root { --fg:#111; --bg:#fff; --muted:#666; --accent:#2d6cdf; }
+* { box-sizing: border-box; }
+body { font-family: system-ui, -apple-system, Segoe UI, Roboto, Arial; color: var(--fg); background: var(--bg); margin: 0; }
+.container { max-width: 960px; margin: 0 auto; padding: 16px; }
+header.container { display:flex; justify-content: space-between; align-items:center; border-bottom:1px solid #eee; }
+.logo { font-weight: 700; text-decoration: none; color: var(--fg); }
+.small { font-size: 12px; }
+.muted { color: var(--muted); }

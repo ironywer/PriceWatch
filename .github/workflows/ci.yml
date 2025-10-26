@@ -41,10 +41,8 @@ jobs:
 
       - name: Lint (flake8)
         run: |
-          # критичные ошибки
-          flake8 . --count --select=E9,F63,F7,F82 --show-source --statistics
-          # остальные как предупреждения
-          flake8 . --count --exit-zero --max-complexity=10 --max-line-length=127 --statistics
+          flake8 . --count --select=E,F,W --max-complexity=10 --max-line-length=127 --show-source --statistics
+
 
   docker_build:
     runs-on: ubuntu-latest
@@ -94,8 +92,21 @@ jobs:
         uses: docker/build-push-action@v6
         with:
           context: .
+          # пушим только при пуше в main и когда есть токен
           push: ${{ github.event_name == 'push' && github.ref == 'refs/heads/main' && env.DOCKERHUB_TOKEN != '' }}
+          # если НЕ пушим — загружаем образ в локальный docker-daemon для последующего docker run
+          load: ${{ !(github.event_name == 'push' && github.ref == 'refs/heads/main' && env.DOCKERHUB_TOKEN != '') }}
           tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}
           cache-from: type=gha
           cache-to: type=gha,mode=max
+
+      - name: Verify container starts and responds (script)
+        if: steps.df.outputs.found == 'true'
+        env:
+          IMAGE_TAGS: ${{ steps.meta.outputs.tags }}
+          PORT: "8000"
+          HEALTH_PATH: "/health"
+          STARTUP_TIMEOUT: "20"
+          CONTAINER_NAME: "app-test"
+        run: bash scripts/verify_container.sh

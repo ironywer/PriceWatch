@@ -11,6 +11,3 @@ app.mount("/static", StaticFiles(directory="static"), name="static")
 
 app.include_router(main_router)
 app.include_router(search_router)
-
-
-# app.include_router(api_products_router, prefix="/api", tags=["products"])

@@ -9,3 +9,8 @@ templates = Jinja2Templates(directory="app/templates")
 @router.get("/", response_class=HTMLResponse)
 async def index(request: Request):
     return templates.TemplateResponse("index.html", {"request": request})
+
+
+@router.get("/health", response_class=HTMLResponse)
+async def health():
+    return {"status": "ok"}

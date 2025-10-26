@@ -1,6 +1,7 @@
-from sqlalchemy import Column, Integer, String, ForeignKey
+from sqlalchemy import Column, Integer, ForeignKey
 from sqlalchemy.orm import relationship
 from app.db.database import Base
+
 
 class Wishlist(Base):
     __tablename__ = "wishlists"

@@ -97,3 +97,13 @@ jobs:
           labels: ${{ steps.meta.outputs.labels }}
           cache-from: type=gha
           cache-to: type=gha,mode=max
+
+      - name: Verify container starts and responds (script)
+        if: steps.df.outputs.found == 'true'
+        env:
+          IMAGE_TAGS: ${{ steps.meta.outputs.tags }}
+          PORT: "8000"
+          HEALTH_PATH: "/health"
+          STARTUP_TIMEOUT: "20"
+          CONTAINER_NAME: "app-test"
+        run: bash scripts/verify_container.sh

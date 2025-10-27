@@ -1,0 +1,10 @@
+{% extends "base.html" %}
+{% block title %}Требуется авторизация — PriceWatch{% endblock %}
+{% block content %}
+  <h1>Требуется авторизация</h1>
+  <p class="muted">{{ message }}</p>
+  <div class="actions">
+    <a class="button" href="/auth/login">Войти</a>
+    <a class="button secondary" href="/auth/register">Регистрация</a>
+  </div>
+{% endblock %}

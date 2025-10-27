@@ -14,6 +14,7 @@ from app.routers.auth import router as auth_router
 
 templates = Jinja2Templates(directory="app/templates")
 
+
 def create_app(engine_override: Engine | None = None) -> FastAPI:
     engine_to_use = engine_override or prod_engine
 
@@ -30,7 +31,6 @@ def create_app(engine_override: Engine | None = None) -> FastAPI:
     app.include_router(search_router)
     app.include_router(auth_router)
 
-
     @app.exception_handler(HTTPException)
     async def http_exception_handler(request: Request, exc: HTTPException):
         accept = request.headers.get("accept", "")
@@ -44,7 +44,6 @@ def create_app(engine_override: Engine | None = None) -> FastAPI:
             msg = reasons.get(str(exc.detail), "Требуется авторизация.")
             return templates.TemplateResponse("401.html", {"request": request, "message": msg}, status_code=401)
         return JSONResponse({"detail": exc.detail}, status_code=exc.status_code, headers=exc.headers or {})
-
 
     @app.get("/health")
     async def health():

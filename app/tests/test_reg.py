@@ -12,6 +12,7 @@ invalid_emails = [
     ("@example.com", "Secret123", None),
 ]
 
+
 @pytest.mark.parametrize("email,password,full_name", valid_data)
 def test_register_success(client: TestClient, email, password, full_name):
     resp = client.post(

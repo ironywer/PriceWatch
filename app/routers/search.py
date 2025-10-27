@@ -14,4 +14,4 @@ async def search_page(
         request: Request,
         user: User = Depends(get_current_user),
 ):
-    return templates.TemplateResponse("search.html", {"request": request, "user": user})
+    return templates.TemplateResponse(request,"search.html", {"user": user})

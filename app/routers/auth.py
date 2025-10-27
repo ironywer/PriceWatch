@@ -22,12 +22,14 @@ MAX_PASSWORD_LENGTH = 72
 
 @router.get("/login", response_class=HTMLResponse)
 def login_page(request: Request):
-    return templates.TemplateResponse("login.html", {"request": request})
+    return templates.TemplateResponse(request,
+                                      "login.html")
 
 
 @router.get("/register", response_class=HTMLResponse)
 def register_page(request: Request):
-    return templates.TemplateResponse("register.html", {"request": request})
+    return templates.TemplateResponse(request,
+                                      "register.html")
 
 
 @router.post("/register")
@@ -42,29 +44,33 @@ def register(
         _RegisterValidate(email=email)
     except ValidationError:
         return templates.TemplateResponse(
+            request,
             "register.html",
-            {"request": request, "error": "Пожалуйста, укажите корректный email."},
+            {"error": "Пожалуйста, укажите корректный email."},
             status_code=400,
         )
     if len(password) < MIN_PASSWORD_LENGTH:
         return templates.TemplateResponse(
+            request,
             "register.html",
-            {"request": request, "error": f"Пароль должен быть ≥ {MIN_PASSWORD_LENGTH} символов."},
+            {"error": f"Пароль должен быть ≥ {MIN_PASSWORD_LENGTH} символов."},
             status_code=400,
         )
 
     if len(password.encode("utf-8")) > MAX_PASSWORD_LENGTH:
         return templates.TemplateResponse(
+            request,
             "register.html",
-            {"request": request, "error": f"Пароль слишком длинный. Максимум {MAX_PASSWORD_LENGTH} байт."},
+            {"error": f"Пароль слишком длинный. Максимум {MAX_PASSWORD_LENGTH} байт."},
             status_code=400,
         )
 
     existing = db.query(User).filter(User.email == email).first()
     if existing:
         return templates.TemplateResponse(
+            request,
             "register.html",
-            {"request": request, "error": "Этот email уже используется"},
+            {"error": "Этот email уже используется"},
             status_code=400,
         )
     user = User(
@@ -89,8 +95,9 @@ def login(
     user = db.query(User).filter(User.email == email).first()
     if not user or not verify_password(password, user.hashed_password):
         return templates.TemplateResponse(
+            request,
             "login.html",
-            {"request": request, "error": "Неверный email или пароль"},
+            {"error": "Неверный email или пароль"},
             status_code=400,
         )
 
@@ -117,6 +124,7 @@ def logout():
 @router.get("/me", response_class=HTMLResponse)
 def me(request: Request, current: User = Depends(get_current_user)):
     return templates.TemplateResponse(
+        request,
         "me.html",
-        {"request": request, "user": current}
+        {"user": current}
     )

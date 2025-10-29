@@ -1,3 +1,4 @@
+<<<<<<< HEAD
 {% extends "base.html" %}
 {% block title %}Поиск товаров — PriceWatch{% endblock %}
 {% block content %}
@@ -197,4 +198,206 @@
         document.getElementById('searchInput').focus();
     </script>
 
+=======
+{% extends "base.html" %}
+{% block title %}Поиск товаров — PriceWatch{% endblock %}
+{% block content %}
+
+<style>
+    .container {
+        max-width: 1200px;
+        margin: 0 auto;
+        padding: 20px;
+    }
+        
+    .games-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fill, minmax(250px, 1fr));
+        gap: 20px;
+        margin-top: 20px;
+    }
+
+    .game-card {
+        border: 1px solid #ddd;
+        border-radius: 8px;
+        padding: 15px;
+        text-align: center;
+        background: white;
+        box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        transition: transform 0.2s, box-shadow 0.2s;
+    }
+
+    .game-card:hover {
+        transform: translateY(-2px);
+        box-shadow: 0 4px 8px rgba(0,0,0,0.15);
+    }
+
+    .game-image {
+        width: 100%;
+        height: 120px;
+        object-fit: cover;
+        border-radius: 4px;
+        margin-bottom: 10px;
+    }
+
+    .game-title {
+        margin: 10px 0 5px 0;
+        font-size: 16px;
+        font-weight: bold;
+        height: 40px;
+        overflow: hidden;
+        display: -webkit-box;
+        -webkit-line-clamp: 2;
+        -webkit-box-orient: vertical;
+    }
+
+    .game-publisher {
+        color: #666;
+        font-size: 12px;
+        margin-bottom: 10px;
+        height: 20px;
+        overflow: hidden;
+    }
+
+    .game-price {
+        font-weight: bold;
+        color: #2ecc71;
+        font-size: 14px;
+    }
+    
+    .game-price s {
+        color: #999;
+        margin-right: 5px;
+    }
+    
+    .search-form {
+        margin: 20px 0;
+        text-align: center;
+    }
+    
+    .search-form input {
+        padding: 12px;
+        width: 400px;
+        margin-right: 10px;
+        border: 1px solid #ddd;
+        border-radius: 4px;
+        font-size: 16px;
+    }
+    
+    .search-form button {
+        padding: 12px 24px;
+        background: #1b2838;
+        color: white;
+        border: none;
+        border-radius: 4px;
+        cursor: pointer;
+        font-size: 16px;
+    }
+    
+    .search-form button:hover {
+        background: #2a475e;
+    }
+    
+    h1 {
+        text-align: center;
+        color: #1b2838;
+        margin-bottom: 10px;
+    }
+    
+    .subtitle {
+        text-align: center;
+        color: #666;
+        margin-bottom: 30px;
+    }
+    
+    .loading {
+        text-align: center;
+        padding: 40px;
+        color: #666;
+    }
+</style>
+<div class="container">
+        <h1>🎮 Популярные игры в Steam</h1>
+        <p class="subtitle">Самые популярные и акционные игры на данный момент</p>
+        
+        <!-- Форма поиска -->
+        <div class="search-form">
+            <input type="text" id="searchInput" placeholder="Введите название игры для поиска...">
+            <button onclick="searchGames()">Найти</button>
+        </div>
+        
+        <!-- Контейнер для результатов -->
+        <div id="results" class="games-grid">
+            {% if featured_games %}
+                {% for game in featured_games %}
+                <div class="game-card">
+                    <img src="{{ game.image }}" alt="{{ game.name }}" class="game-image" 
+                         onerror="this.src='https://via.placeholder.com/460x215/1b2838/ffffff?text=No+Image'">
+                    <div class="game-info">
+                        <h3 class="game-title">{{ game.name }}</h3>
+                        <p class="game-publisher">{{ game.publisher }}</p>
+                        <div class="game-price">{{ game.price | safe }}</div>
+                    </div>
+                </div>
+                {% endfor %}
+            {% else %}
+                <div class="loading">Загрузка игр...</div>
+            {% endif %}
+        </div>
+    </div>
+
+    <script>
+        async function searchGames() {
+            const query = document.getElementById('searchInput').value;
+            if (query.length < 2) {
+                alert('Введите хотя бы 2 символа для поиска');
+                return;
+            }
+            
+            const resultsContainer = document.getElementById('results');
+            resultsContainer.innerHTML = '<div class="loading">Поиск игр...</div>';
+            
+            try {
+                const response = await fetch(`/api/search?query=${encodeURIComponent(query)}`);
+                const games = await response.json();
+                
+                displayGames(games);
+            } catch (error) {
+                resultsContainer.innerHTML = '<div class="loading">Ошибка при поиске</div>';
+            }
+        }
+
+        function displayGames(games) {
+            const container = document.getElementById('results');
+            
+            if (games.length === 0) {
+                container.innerHTML = '<div class="loading">Игры не найдены</div>';
+                return;
+            }
+            
+            container.innerHTML = games.map(game => `
+                <div class="game-card">
+                    <img src="${game.image}" alt="${game.name}" class="game-image"
+                         onerror="this.src='https://via.placeholder.com/460x215/1b2838/ffffff?text=No+Image'">
+                    <div class="game-info">
+                        <h3 class="game-title">${game.name}</h3>
+                        <p class="game-publisher">${game.publisher}</p>
+                        <div class="game-price">${game.price}</div>
+                    </div>
+                </div>
+            `).join('');
+        }
+        
+        // Поиск при нажатии Enter
+        document.getElementById('searchInput').addEventListener('keypress', function(e) {
+            if (e.key === 'Enter') {
+                searchGames();
+            }
+        });
+        
+        // Авто-фокус на поле поиска
+        document.getElementById('searchInput').focus();
+    </script>
+
+>>>>>>> 455ab93405207703b162870d10221da0f6ac50f7
 {% endblock %}

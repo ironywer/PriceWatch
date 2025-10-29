@@ -1,0 +1,65 @@
+name: FastAPI CI
+
+on:
+  push:
+    branches: [ Parce_Service_Steam ]
+  pull_request:
+    branches: [ Parce_Service_Steam ]
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+      
+    - name: Set up Python 3.13
+      uses: actions/setup-python@v4
+      with:
+        python-version: '3.13'
+        
+    - name: Install dependencies
+      run: |
+        python -m pip install --upgrade pip
+        pip install -r requirements.txt
+        
+    - name: Verify imports
+      run: |
+        python -c "from app.main import app; print('FastAPI app imported successfully')"
+        python -c "from app.routers.main import router; print('Main router imported successfully')"
+        python -c "from app.routers.search import router; print('Search router imported successfully')"
+        python -c "from app.services.steam_service import SteamDataService; print('Steam service imported successfully')"
+        echo "All imports successful!"
+        
+    - name: Check template files
+      run: |
+        echo "Checking template files:"
+        find app/templates -name "*.html" | head -10
+        echo "Templates check completed"
+        
+    - name: Check static files
+      run: |
+        echo "Checking static directory:"
+        ls -la static/ || echo "Static directory not found or empty"
+        
+    - name: Test server startup
+      run: |
+
+        python -m uvicorn app.main:app --host 0.0.0.0 --port 8000 &
+        SERVER_PID=$!
+        
+        sleep 5
+        
+        # Проверка что сервер запустился
+        echo "Testing server response..."
+        if curl -f http://localhost:8000/; then
+          echo "GOOD: Server started successfully and responding"
+        else
+          echo "BAD: Server not responding properly"
+          exit 1
+        fi
+        
+        # Останавливаем сервер
+        kill $SERVER_PID
+        echo "Server test completed successfully"

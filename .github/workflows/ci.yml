@@ -2,9 +2,9 @@ name: FastAPI CI
 
 on:
   push:
-    branches: [ Parce_Service_Steam ]
+    branches: [ Parse_Service_Steam ]
   pull_request:
-    branches: [ Parce_Service_Steam ]
+    branches: [ Parse_Service_Steam ]
 
 jobs:
   build:

@@ -1,13 +1,13 @@
-name: FastAPI CI
+name: FastAPI CI/CD
 
 on:
   push:
-    branches: [ Parse_Service_Steam ]
+    branches: [ Parse_Service_Steam, development, TestBranchCiCD]
   pull_request:
-    branches: [ Parse_Service_Steam ]
+    branches: [ Parse_Service_Steam, TestBranchCiCD]
 
 jobs:
-  build:
+  test:
     runs-on: ubuntu-latest
     
     steps:
@@ -23,14 +23,18 @@ jobs:
       run: |
         python -m pip install --upgrade pip
         pip install -r requirements.txt
+        pip install pytest pytest-asyncio httpx requests
         
-    - name: Verify imports
+    - name: Run unit tests
       run: |
-        python -c "from app.main import app; print('✅ FastAPI app imported successfully')"
-        python -c "from app.routers.main import router; print('✅ Main router imported successfully')"
-        python -c "from app.routers.search import router; print('✅ Search router imported successfully')"
-        python -c "from app.services.steam_service import SteamDataService; print('✅ Steam service imported successfully')"
-        echo "All imports successful!"
+        python -m pytest tests/ -v
+        
+    - name: Verify imports and basic functionality
+      run: |
+        python -c "from app.main import app; print('FastAPI app imported successfully')"
+        python -c "from app.routers.main import router; print('Main router imported successfully')"
+        python -c "from app.routers.search import router; print('Search router imported successfully')"
+        python -c "from app.services.steam_service import SteamDataService; print('Steam service imported successfully')"
         
     - name: Check template files
       run: |
@@ -38,6 +42,7 @@ jobs:
         find app/templates -name "*.html" | head -10
         echo "Templates check completed"
         
-    - name: Test server startup
+    - name: Start server
       run: |
+        # Запускает сервер в фоне
         timeout 30s python -m uvicorn app.main:app --host 0.0.0.0 --port 8000 || echo "Server test completed"

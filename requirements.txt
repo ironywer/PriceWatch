@@ -4,3 +4,7 @@ jinja2
 python-multipart
 requests
 aiohttp
+pytest
+pytest-asyncio
+httpx
+flake8

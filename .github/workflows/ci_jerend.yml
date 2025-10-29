@@ -2,9 +2,9 @@ name: FastAPI CI/CD
 
 on:
   push:
-    branches: [ Parse_Service_Steam, development, TestBranchCiCD]
+    branches: [ Parse_Service_Steam, development, release]
   pull_request:
-    branches: [ Parse_Service_Steam, TestBranchCiCD]
+    branches: [ Parse_Service_Steam]
 
 jobs:
   test:
@@ -39,6 +39,7 @@ jobs:
     - name: Check template files
       run: |
         echo "Checking template files:"
+
         find app/templates -name "*.html" | head -10
         echo "Templates check completed"
         

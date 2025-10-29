@@ -45,14 +45,13 @@ jobs:
         
     - name: Test server startup
       run: |
-        # Запускаем сервер в фоне
+
         python -m uvicorn app.main:app --host 0.0.0.0 --port 8000 &
         SERVER_PID=$!
         
-        # Ждем запуска сервера
         sleep 5
         
-        # Проверяем что сервер запустился
+        # Проверка что сервер запустился
         echo "Testing server response..."
         if curl -f http://localhost:8000/; then
           echo "GOOD: Server started successfully and responding"

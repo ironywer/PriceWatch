@@ -2,9 +2,9 @@ name: FastAPI CI/CD
 
 on:
   push:
-    branches: [ Parse_Service_Steam, development, TestBranchCiCD]
+    branches: [ Parse_Service_Steam, development, release]
   pull_request:
-    branches: [ Parse_Service_Steam, TestBranchCiCD]
+    branches: [ Parse_Service_Steam]
 
 jobs:
   test:
@@ -39,6 +39,7 @@ jobs:
     - name: Check template files
       run: |
         echo "Checking template files:"
+
         find app/templates -name "*.html" | head -10
         echo "Templates check completed"
         
@@ -46,3 +47,24 @@ jobs:
       run: |
         # Запускает сервер в фоне
         timeout 30s python -m uvicorn app.main:app --host 0.0.0.0 --port 8000 || echo "Server test completed"
+
+  docs:
+    runs-on: ubuntu-latest
+    needs: test
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+      
+    - name: Set up Python 3.13
+      uses: actions/setup-python@v4
+      with:
+        python-version: '3.13'
+        
+    - name: Install dependencies
+      run: |
+        pip install -r requirements.txt
+        
+    - name: Generate documentation
+      run: |
+

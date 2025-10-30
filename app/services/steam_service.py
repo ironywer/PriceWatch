@@ -6,11 +6,7 @@ from urllib.parse import quote
 
 logger = logging.getLogger(__name__)
 
-def SortArr(arr, boo):
-    if bool==True:
-        return sorted(arr)
-    else:
-        return sorted(arr, reverse=True)
+
 
 class SteamDataService:
     def __init__(self, api_key: str = None):

@@ -64,22 +64,7 @@ jobs:
     - name: Install dependencies
       run: |
         pip install -r requirements.txt
-        pip install pydantic
         
-    - name: Generate API documentation
+    - name: Generate documentation
       run: |
-        python -c "
-        from app.main import app
-        from fastapi.openapi.utils import get_openapi
-        
-        openapi_schema = get_openapi(
-            title=app.title,
-            version='1.0.0',
-            description='PriceWatch API Documentation',
-            routes=app.routes,
-        )
-        
-        with open('docs/openapi.json', 'w') as f:
-            import json
-            json.dump(openapi_schema, f, indent=2)
-        "
+

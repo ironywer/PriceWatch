@@ -6,6 +6,8 @@ from urllib.parse import quote
 
 logger = logging.getLogger(__name__)
 
+
+
 class SteamDataService:
     def __init__(self, api_key: str = None):
         self.api_key = api_key

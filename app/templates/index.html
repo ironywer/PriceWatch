@@ -1,7 +1,23 @@
 {% extends "base.html" %}
 {% block title %}PriceWatch — главная{% endblock %}
 {% block content %}
-<h1>Добро пожаловать в PriceWatch</h1>
-<p class="muted">Сервис для сравнения цен.</p>
-<a href="/search" class="button">Перейти к поиску</a>
+
+<h1>Добро пожаловать в PriceWatch 👋</h1>
+<p class="muted">Отслеживайте цены на игры и получайте уведомления о скидках!</p>
+
+{% if user %}
+  <p>Вы авторизованы как <strong>{{ user.full_name or user.email }}</strong></p>
+  <div class="actions">
+    <a href="/auth/me" class="button">Мой профиль</a>
+    <a href="/search" class="button">Поиск игр</a>
+    <a href="/wishlist" class="button">Мой вишлист</a>
+    <a href="/auth/logout" class="link">Выход</a>
+  </div>
+{% else %}
+  <div class="actions">
+    <a href="/auth/login" class="button">Войти</a>
+    <a href="/auth/register" class="button secondary">Регистрация</a>
+  </div>
+{% endif %}
+
 {% endblock %}

@@ -5,9 +5,7 @@ from app.routers.search import router as search_router
 
 app = FastAPI(title="PriceWatch — MVP")
 
-
 app.mount("/static", StaticFiles(directory="static"), name="static")
-
 
 app.include_router(main_router)
 app.include_router(search_router)

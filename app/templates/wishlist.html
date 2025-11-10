@@ -1,0 +1,30 @@
+{% extends "base.html" %}
+
+{% block title %}Ваш вишлист{% endblock %}
+
+{% block content %}
+<h1>Ваш вишлист</h1>
+
+{% if items %}
+<ul class="wishlist">
+    {% for item in items %}
+    <li>
+        Игра Steam #{{ item.steam_app_id }}
+
+        <form action="/wishlist/{{ item.id }}/delete" method="post" style="display:inline;">
+            <button type="submit" class="danger">Удалить</button>
+        </form>
+    </li>
+    {% endfor %}
+</ul>
+{% else %}
+<p>Ваш вишлист пока пуст.</p>
+{% endif %}
+
+<h2>Добавить игру</h2>
+<form method="post" action="/wishlist/add">
+    <input type="number" name="steam_app_id">
+    <button type="submit">Добавить</button>
+</form>
+
+{% endblock %}

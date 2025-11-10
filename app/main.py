@@ -11,7 +11,7 @@ from app.db.database import Base, engine as prod_engine
 from app.routers.main import router as main_router
 from app.routers.search import router as search_router
 from app.routers.auth import router as auth_router
-
+from app.routers.wishlist import router as wishlist_router
 templates = Jinja2Templates(directory="app/templates")
 
 
@@ -30,6 +30,7 @@ def create_app(engine_override: Engine | None = None) -> FastAPI:
     app.include_router(main_router)
     app.include_router(search_router)
     app.include_router(auth_router)
+    app.include_router(wishlist_router)
 
     @app.exception_handler(HTTPException)
     async def http_exception_handler(request: Request, exc: HTTPException):

@@ -1,12 +1,14 @@
-from fastapi import APIRouter, Request, Query, HTTPException
-from fastapi.responses import HTMLResponse, JSONResponse
+from fastapi import APIRouter, Request, Depends, Query, HTTPException
+from fastapi.responses import HTMLResponse
 from fastapi.templating import Jinja2Templates
 
 from app.services.steam_service import SteamDataService
+from app.deps import get_current_user
+from app.models import User
 
-import xml.etree.ElementTree as ET
-import requests
 from datetime import datetime
+import requests
+import xml.etree.ElementTree as ET
 
 router = APIRouter()
 templates = Jinja2Templates(directory="app/templates")
@@ -14,19 +16,22 @@ templates = Jinja2Templates(directory="app/templates")
 steam_service = SteamDataService("79DCEEEC80EB29431B88CA479CA11E56") # Инициализация сервиса
 
 @router.get("/search", response_class=HTMLResponse)
-async def search_page(request: Request):
+async def search_page(request: Request, user: User = Depends(get_current_user)):
     """Главная страница поиска - показывает популярные игры"""
+    featured_games = await steam_service.get_featured_games()  # Получение популярных игр с главной страницы Steam
     try:
-        featured_games = await steam_service.get_featured_games() #Получение популярных игр с главной страницы Steam
+        featured_games = await steam_service.get_featured_games()  # Получение популярных игр с главной страницы Steam
         return templates.TemplateResponse("search.html", {
             "request": request,
-            "featured_games": featured_games
+            "featured_games": featured_games,
+            "user": user
         })
     except Exception as e:
         # В случае ошибки
         return templates.TemplateResponse("search.html", {
             "request": request,
-            "featured_games": []
+            "featured_games": [],
+            "user": user
         })
 
 @router.get("/api/search")

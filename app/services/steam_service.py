@@ -8,11 +8,15 @@ logger = logging.getLogger(__name__)
 
 class SteamDataService:
     def __init__(self, api_key: str = None):
-        self.api_key = api_key
+        set_api_key(api_key)
         self.base_url = "https://store.steampowered.com/api"
         self.featured_url = "https://store.steampowered.com/api/featuredcategories"
         self.search_url = "https://store.steampowered.com/api/storesearch"
+        self.price_formatter = PriceFormatter()
     
+    def set_api_key(self, api_key: str):
+        self.api_key = api_key
+
     async def search_games(self, query: str) -> List[Dict]:
         """Поиск игр по названию в Steam"""
         try:
@@ -63,14 +67,8 @@ class SteamDataService:
             name = detailed_info.get('name', item.get('name', 'Unknown Game'))
             
             #обработка цены
-            price_info = detailed_info.get('price_overview', {})
-            if price_info:
-                price = f"{price_info.get('final', 0) / 100:.2f} руб."
-                if price_info.get('discount_percent', 0) > 0:
-                    price = f"<s>{price_info.get('initial', 0) / 100:.2f} руб.</s> {price} (-{price_info['discount_percent']}%)"
-            else:
-                price = "Бесплатно" if detailed_info.get('is_free', False) else "Цена не указана"
-            
+            price = self.price_formatter.format(detailed_info)
+
             #издатель
             publishers = detailed_info.get('publishers', [])
             publisher = publishers[0] if publishers else item.get('publisher', 'Неизвестный издатель')
@@ -158,20 +156,14 @@ class SteamDataService:
             if not appid:
                 return None
              
-            detailed_info = await self._get_app_details(appid) # Получаем детальную информацию об игре
+            detailed_info = await self._get_app_details(appid) # Получает детальную информацию об игре
             if not detailed_info:
                 return None
             
             name = detailed_info.get('name', item.get('name', 'Unknown Game'))
 
-            price_info = detailed_info.get('price_overview', {})
-            if price_info:
-                price = f"{price_info.get('final', 0) / 100:.2f} руб."
-                if price_info.get('discount_percent', 0) > 0:
-                    price = f"<s>{price_info.get('initial', 0) / 100:.2f} руб.</s> {price} (-{price_info['discount_percent']}%)"
-            else:
-                price = "Бесплатно" if detailed_info.get('is_free', False) else "Цена не указана"
-            
+            price = self.price_formatter.format(detailed_info)
+
             #издатель
             publishers = detailed_info.get('publishers', [])
             publisher = publishers[0] if publishers else "Неизвестный издатель"
@@ -209,7 +201,54 @@ class SteamDataService:
         except Exception as e:
             logger.error(f"Error getting app details for {appid}: {e}")
             return None
-        
-    async def get_game_details(self, app_id: int) -> Optional[Dict]:
-        """Получение детальной информации об игре"""
-        return await self._get_app_details(app_id)
+
+    async def _get_fallback_games(self, game_list: str = "default") -> List[Dict]:
+        """При ошибке API"""
+        fallback_games = {
+            "default": [
+                {
+                    "appid": 570,
+                    "name": "Dota 2",
+                    "publisher": "Valve",
+                    "price": "Бесплатно",
+                    "image": "https://cdn.cloudflare.steamstatic.com/steam/apps/570/header.jpg",
+                    "type": "game"
+                },
+                {
+                    "appid": 730,
+                    "name": "Counter-Strike 2",
+                    "publisher": "Valve",
+                    "price": "Бесплатно",
+                    "image": "https://cdn.cloudflare.steamstatic.com/steam/apps/730/header.jpg",
+                    "type": "game"
+                }
+            ],
+            "popular": [
+                {
+                    "appid": 578080,
+                    "name": "PUBG: BATTLEGROUNDS",
+                    "publisher": "KRAFTON, Inc.",
+                    "price": "Бесплатно",
+                    "image": "https://cdn.cloudflare.steamstatic.com/steam/apps/578080/header.jpg",
+                    "type": "game"
+                }
+            ]
+        }
+        return fallback_games.get(game_list, fallback_games["default"])
+    
+class PriceFormatter:
+    def format(self, detailed_info: Dict) -> str:
+        price_info = detailed_info.get('price_overview', {})
+        if price_info:
+            return self._format_paid_game(price_info)
+        else:
+            return self._format_free_game(detailed_info)
+    
+    def _format_paid_game(self, price_info: Dict) -> str:
+        price = f"{price_info.get('final', 0) / 100:.2f} руб."
+        if price_info.get('discount_percent', 0) > 0:
+            price = f"<s>{price_info.get('initial', 0) / 100:.2f} руб.</s> {price} (-{price_info['discount_percent']}%)"
+        return price
+    
+    def _format_free_game(self, detailed_info: Dict) -> str:
+        return "Бесплатно" if detailed_info.get('is_free', False) else "Цена не указана"

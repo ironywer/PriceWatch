@@ -12,5 +12,8 @@ templates = Jinja2Templates(directory="app/templates")
 async def index(
     request: Request,
     user: User | None = Depends(get_current_user_optional)
-    ):
-    return templates.TemplateResponse("index.html", {"request": request, "user": user})
+):
+    return templates.TemplateResponse(
+        "index.html", 
+        {"request": request, "user": user}
+    )

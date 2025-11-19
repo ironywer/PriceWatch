@@ -31,8 +31,8 @@ class SteamDataService:
                     else:
                         logger.error(f"Steam search API error: {response.status}")
                         return []
-        except Exception as e:
-            logger.error(f"Error searching games: {e}")
+        except Exception:
+            logger.error("Error searching games")
             return []
 
     async def _parse_search_results(self, data: Dict) -> List[Dict]:
@@ -41,7 +41,8 @@ class SteamDataService:
 
         if 'items' in data:
             for item in data['items']:
-                if len(games) >= 20:  # ограничение на 20 игр
+                # ограничение на 20 игр
+                if len(games) >= 20:
                     break
 
                 game_data = await self._extract_game_from_search(item)
@@ -68,8 +69,8 @@ class SteamDataService:
                 ),
                 "type": "game"
             }
-        except Exception as e:
-            logger.error(f"Error creating basic game info: {e}")
+        except Exception:
+            logger.error("Error creating basic game info")
             return None
 
     async def get_featured_games(self) -> List[Dict]:
@@ -83,8 +84,8 @@ class SteamDataService:
                     else:
                         logger.error(f"Steam API error: {response.status}")
                         return []
-        except Exception as e:
-            logger.error(f"Error fetching featured games: {e}")
+        except Exception:
+            logger.error("Error fetching featured games")
             return []
 
     async def _parse_featured_games(self, data: Dict) -> List[Dict]:
@@ -102,7 +103,8 @@ class SteamDataService:
         for category in featured_categories:
             if category in data and 'items' in data[category]:
                 for item in data[category]['items']:
-                    if len(games) >= 24:  # максимум 24 игры
+                    # максимум 24 игры
+                    if len(games) >= 24:
                         break
 
                     game_data = await self._extract_game_info(item)
@@ -114,7 +116,8 @@ class SteamDataService:
     async def _extract_game_info(self, item: Dict) -> Optional[Dict]:
         """Извлечение информации об игре из элемента"""
         try:
-            appid = item.get('id') or item.get('appid')  # Получение appid
+            # Получение appid
+            appid = item.get('id') or item.get('appid')
             if not appid:
                 return None
 
@@ -124,8 +127,8 @@ class SteamDataService:
 
             return await self._build_game_data(detailed_info, item, appid)
 
-        except Exception as e:
-            logger.error(f"Error extracting game info: {e}")
+        except Exception:
+            logger.error("Error extracting game info")
             return None
 
     async def _extract_game_from_search(self, item: Dict) -> Optional[Dict]:
@@ -141,8 +144,8 @@ class SteamDataService:
 
             return await self._build_game_data(detailed_info, item, appid)
 
-        except Exception as e:
-            logger.error(f"Error extracting game from search: {e}")
+        except Exception:
+            logger.error("Error extracting game from search")
             return self._create_basic_game_info(item)
 
     async def _build_game_data(self, detailed_info: Dict, fallback_item: Dict, appid: int) -> Dict:
@@ -161,10 +164,9 @@ class SteamDataService:
         )
 
         # Изображение
-        image_url = (
-            detailed_info.get('header_image') or
-            f"https://cdn.cloudflare.steamstatic.com/steam/apps/{appid}/header.jpg"
-        )
+        header_image = detailed_info.get('header_image')
+        default_image = f"https://cdn.cloudflare.steamstatic.com/steam/apps/{appid}/header.jpg"
+        image_url = header_image or default_image
 
         return {
             "appid": appid,
@@ -189,8 +191,8 @@ class SteamDataService:
                         if app_data.get('success'):
                             return app_data.get('data')
             return None
-        except Exception as e:
-            logger.error(f"Error getting app details for {appid}: {e}")
+        except Exception:
+            logger.error(f"Error getting app details for {appid}")
             return None
 
 

@@ -168,13 +168,13 @@
 <div class="container">
         <h1>Популярные игры в Steam</h1>
 
-        <!-- Форма поиска -->
+        <!-- Строка поиска -->
         <div class="search-form">
             <input type="text" id="searchInput" placeholder="Введите название игры для поиска...">
             <button onclick="searchGames()">Найти</button>
         </div>
         
-        <!-- Контейнер для результатов -->
+        <!-- Стена для вывода игр -->
         <div id="results" class="games-grid">
             {% if featured_games %}
                 {% for game in featured_games %}
@@ -199,14 +199,12 @@
         // Объект для хранения курсов валют
         let exchangeRates = {RUB: 1, USD: 90, EUR: 98 };
 
-        // Текущая валюта
         let currentCurrency = 'RUB';
 
-        //функция для получения курсов валют с ЦБ РФ, они актуальны только один час и хранятся в localStorage
+        //Получение курсов валют с ЦБ РФ, они актуальны только один час и хранятся в localStorage
         async function fetchExchangeRates() {
             try {
-                //есть ли сохраненные курсы в localStorage
-                const savedRates = localStorage.getItem('exchangeRates');
+                const savedRates = localStorage.getItem('exchangeRates');                //есть ли сохраненные курсы в localStorage
                 const savedTimestamp = localStorage.getItem('exchangeRatesTimestamp');
                 
                 if (savedRates && savedTimestamp) {
@@ -218,8 +216,8 @@
                     }
                 }
                 
-                // Если нет сохраненных курсов или они устарели, загружает новые
-                const response = await fetch('/api/exchange-rates');
+                
+                const response = await fetch('/api/exchange-rates');// Если нет сохраненных курсов или они устарели, загружает новые
                 const rates = await response.json();
                 
                 if (rates.USD && rates.EUR) {
@@ -231,17 +229,17 @@
                     localStorage.setItem('exchangeRatesTimestamp', Date.now().toString());
                     console.log('Курсы валют обновлены и сохранены');
                 }
-            } catch (error) {
+            } 
+            catch (error) {
                 // Использует сохраненные курсы даже если они устарели
                 const savedRates = localStorage.getItem('exchangeRates');
                 if (savedRates) {
                     exchangeRates = JSON.parse(savedRates);
-                    console.log('Использует устаревшие курсы из-за ошибки');
                 }
             }
         }
 
-        // Функция для конвертации цены со скидкой
+        //Конвертация цены со скидкой
         function convertPrice(priceText, toCurrency) {
             if (priceText.includes(getCurrencySymbol(toCurrency))) {
                 return priceText;
@@ -259,7 +257,7 @@
             }
         }
 
-        // Функция для конвертации цены со скидкой
+        //Конвертация цены со скидкой
         function convertDiscountedPrice(priceText, toCurrency) {
             // извлечение цен из строки
             const priceMatch = priceText.match(/<s>([\d.,]+)\s*[A-Za-zа-яё]+\.?<\/s>\s*([\d.,]+)\s*[A-Za-zа-яё]+\.?\s*(.*)/);
@@ -284,7 +282,7 @@
             return priceText;
         }
 
-        // Функция для конвертации цены (без скидки)
+        // Функция для конвертации цены без скидки
         function convertSimplePrice(priceText, toCurrency) {
             const originalCurrency = detectCurrency(priceText);
             const priceMatch = priceText.match(/([\d.,]+)/);
@@ -298,7 +296,7 @@
             return priceText;
         }
 
-        // Функция для конвертации суммы
+        // Конвертация суммы
         function convertAmount(amount, fromCurrency, toCurrency) {
             if (fromCurrency === toCurrency) return amount.toFixed(2).replace('.', ',');
             
@@ -317,7 +315,7 @@
             return 'RUB';
         }
 
-        // Функция для получения символа валюты
+        //Функция для получения символа валюты
         function getCurrencySymbol(currency) {
             const symbols = {
                 'RUB': 'руб.',
@@ -338,7 +336,7 @@
             });
         }
 
-        // Обработчик изменения валюты
+        //Обработчик выбора валюты
         document.getElementById('currencySelect').addEventListener('change', function(e) {
             currentCurrency = e.target.value;
             updateAllPrices();
@@ -395,7 +393,6 @@
             }
         });
         
-        // Авто-фокус на поле поиска
         document.getElementById('searchInput').focus();
         
         // Загружает курсы валют при загрузке страницы

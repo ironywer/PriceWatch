@@ -70,4 +70,3 @@ async def get_exchange_rates():
         logger.error("Error fetching exchange rates")
         # Возвращает примерные курсы в случае ошибки
         return {"USD": 90.0, "EUR": 98.0}
-    

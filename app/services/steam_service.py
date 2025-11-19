@@ -1,10 +1,10 @@
 import aiohttp
-import json
-from typing import List, Dict, Optional
 import logging
-from urllib.parse import quote
+from typing import List, Dict, Optional
+
 
 logger = logging.getLogger(__name__)
+
 
 class SteamDataService:
     def __init__(self, api_key: str = None):
@@ -13,7 +13,7 @@ class SteamDataService:
         self.featured_url = "https://store.steampowered.com/api/featuredcategories"
         self.search_url = "https://store.steampowered.com/api/storesearch"
         self.price_formatter = PriceFormatter()
-    
+
     async def search_games(self, query: str) -> List[Dict]:
         """Поиск игр по названию в Steam"""
         try:
@@ -23,51 +23,55 @@ class SteamDataService:
                     'l': 'russian',
                     'cc': 'ru'
                 }
-                
+
                 async with session.get(self.search_url, params=params) as response:
                     if response.status == 200:
                         data = await response.json()
                         return await self._parse_search_results(data)
                     else:
                         logger.error(f"Steam search API error: {response.status}")
+                        return []
         except Exception as e:
             logger.error(f"Error searching games: {e}")
-    
+            return []
+
     async def _parse_search_results(self, data: Dict) -> List[Dict]:
-        """Обработка"""
+        """Обработка результатов поиска"""
         games = []
-        
+
         if 'items' in data:
             for item in data['items']:
-                if len(games) >= 20:  #ограничение на 20 игр
+                if len(games) >= 20:  # ограничение на 20 игр
                     break
-                
+
                 game_data = await self._extract_game_from_search(item)
                 if game_data:
-                    games.append(game_data)   
-        
+                    games.append(game_data)
+
         return games
-    
-    
+
     def _create_basic_game_info(self, item: Dict) -> Optional[Dict]:
         """Базовая информация об игре"""
         try:
             appid = item.get('id')
             name = item.get('name', 'Unknown Game')
             price = item.get('price', {}).get('final_formatted', 'Цена не указана')
-            
+
             return {
                 "appid": appid,
                 "name": name,
                 "publisher": item.get('publisher', 'Неизвестный издатель'),
                 "price": price,
-                "image": item.get('tiny_image', f"https://cdn.cloudflare.steamstatic.com/steam/apps/{appid}/header.jpg"),
+                "image": item.get(
+                    'tiny_image',
+                    f"https://cdn.cloudflare.steamstatic.com/steam/apps/{appid}/header.jpg"
+                ),
                 "type": "game"
             }
         except Exception as e:
             logger.error(f"Error creating basic game info: {e}")
             return None
-    
+
     async def get_featured_games(self) -> List[Dict]:
         """Получение популярных игр с главной страницы Steam"""
         try:
@@ -78,13 +82,15 @@ class SteamDataService:
                         return await self._parse_featured_games(data)
                     else:
                         logger.error(f"Steam API error: {response.status}")
+                        return []
         except Exception as e:
             logger.error(f"Error fetching featured games: {e}")
-    
+            return []
+
     async def _parse_featured_games(self, data: Dict) -> List[Dict]:
         """Парсинг данных из featured categories"""
         games = []
-        
+
         # Категории игр
         featured_categories = [
             'specials',  # Специальные предложения
@@ -92,49 +98,49 @@ class SteamDataService:
             'new_releases',  # Новинки
             'coming_soon'  # Скоро выйдут
         ]
-        
+
         for category in featured_categories:
             if category in data and 'items' in data[category]:
                 for item in data[category]['items']:
                     if len(games) >= 24:  # максимум 24 игры
                         break
-                    
+
                     game_data = await self._extract_game_info(item)
                     if game_data:
                         games.append(game_data)
-        
+
         return games[:24]
-    
+
     async def _extract_game_info(self, item: Dict) -> Optional[Dict]:
         """Извлечение информации об игре из элемента"""
-        try:     
+        try:
             appid = item.get('id') or item.get('appid')  # Получение appid
             if not appid:
                 return None
-            
+
             detailed_info = await self._get_app_details(appid)
             if not detailed_info:
                 return None
-            
+
             return await self._build_game_data(detailed_info, item, appid)
-            
+
         except Exception as e:
             logger.error(f"Error extracting game info: {e}")
             return None
-        
+
     async def _extract_game_from_search(self, item: Dict) -> Optional[Dict]:
         """Извлечение информации из результата поиска"""
         try:
             appid = item.get('id')
             if not appid:
                 return None
-            
+
             detailed_info = await self._get_app_details(appid)
             if not detailed_info:
                 return self._create_basic_game_info(item)
-            
+
             return await self._build_game_data(detailed_info, item, appid)
-                
+
         except Exception as e:
             logger.error(f"Error extracting game from search: {e}")
             return self._create_basic_game_info(item)
@@ -142,21 +148,24 @@ class SteamDataService:
     async def _build_game_data(self, detailed_info: Dict, fallback_item: Dict, appid: int) -> Dict:
         """Сборка данных игры из информации"""
         name = detailed_info.get('name', fallback_item.get('name', 'Unknown Game'))
-        
-        #Цена
+
+        # Цена
         price = self.price_formatter.format(detailed_info)
 
-        #Издатель
+        # Издатель
         publishers = detailed_info.get('publishers', [])
         publisher = (
-            publishers[0] 
-            if publishers 
+            publishers[0]
+            if publishers
             else fallback_item.get('publisher', 'Неизвестный издатель')
         )
-        
-        #Изображение
-        image_url = ( detailed_info.get('header_image') or f"https://cdn.cloudflare.steamstatic.com/steam/apps/{appid}/header.jpg")
-        
+
+        # Изображение
+        image_url = (
+            detailed_info.get('header_image') or
+            f"https://cdn.cloudflare.steamstatic.com/steam/apps/{appid}/header.jpg"
+        )
+
         return {
             "appid": appid,
             "name": name,
@@ -165,14 +174,14 @@ class SteamDataService:
             "image": image_url,
             "type": detailed_info.get('type', 'game')
         }
-    
+
     async def _get_app_details(self, appid: int) -> Optional[Dict]:
         """Получение детальной информации об игре"""
         try:
             async with aiohttp.ClientSession() as session:
                 url = f"{self.base_url}/appdetails"
                 params = {'appids': appid, 'l': 'russian'}
-                
+
                 async with session.get(url, params=params) as response:
                     if response.status == 200:
                         data = await response.json()
@@ -183,21 +192,29 @@ class SteamDataService:
         except Exception as e:
             logger.error(f"Error getting app details for {appid}: {e}")
             return None
-    
-    
+
+
 class PriceFormatter:
     def format(self, detailed_info: Dict) -> str:
+        """Форматирование цены игры"""
         price_info = detailed_info.get('price_overview', {})
         if price_info:
             return self._format_paid_game(price_info)
         else:
             return self._format_free_game(detailed_info)
-    
+
     def _format_paid_game(self, price_info: Dict) -> str:
+        """Форматирование цены платной игры"""
         price = f"{price_info.get('final', 0) / 100:.2f} руб."
         if price_info.get('discount_percent', 0) > 0:
-            price = f"<s>{price_info.get('initial', 0) / 100:.2f} руб.</s> {price} (-{price_info['discount_percent']}%)"
+            initial_price = f"{price_info.get('initial', 0) / 100:.2f} руб."
+            discount = price_info['discount_percent']
+            price = f"<s>{initial_price}</s> {price} (-{discount}%)"
         return price
-    
+
     def _format_free_game(self, detailed_info: Dict) -> str:
-        return "Бесплатно" if detailed_info.get('is_free', False) else "Цена не указана"
+        """Форматирование цены бесплатной игры"""
+        if detailed_info.get('is_free', False):
+            return "Бесплатно"
+        else:
+            return "Цена не указана"

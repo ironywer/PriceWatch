@@ -41,16 +41,8 @@ def create_app(engine_override: Engine | None = None) -> FastAPI:
                 "user_not_found": "Пользователь не найден. Зарегистрируйтесь или войдите.",
             }
             msg = reasons.get(str(exc.detail), "Требуется авторизация.")
-            return templates.TemplateResponse(
-                "401.html", 
-                {"request": request, "message": msg}, 
-                status_code=401
-            )
-        return JSONResponse(
-            {"detail": exc.detail}, 
-            status_code=exc.status_code, 
-            headers=exc.headers or {}
-        )
+            return templates.TemplateResponse("401.html", {"request": request, "message": msg},status_code=401)
+        return JSONResponse({"detail": exc.detail},status_code=exc.status_code,headers=exc.headers or {})
 
     @app.get("/health")
     async def health():

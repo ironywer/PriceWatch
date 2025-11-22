@@ -42,8 +42,10 @@ def get_steam_service():
         logger.error(f"Ошибка инициализации Steam сервиса: {e}")
         return SteamDataService(None)
 
+
 # Инициализация сервиса с ключом из файла
 steam_service = get_steam_service()
+
 
 @router.get("/search", response_class=HTMLResponse)
 async def search_page(request: Request, user: User = Depends(get_current_user)):

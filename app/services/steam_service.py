@@ -100,27 +100,25 @@ class SteamDataService:
                     items_map[appid] = item
 
             # Параллельные запросы для всех игр
-            detailed_infos = await self._get_multiple_app_details(appids, session, max_concurrent=3)           
+            detailed_infos = await self._get_multiple_app_details(appids, session, max_concurrent=3)
             for appid, detailed_info in detailed_infos.items():
                 item = items_map[appid]
                 if detailed_info:
                     game_data = await self._build_game_data(detailed_info, item, appid)
                 else:
-                    game_data = self._create_basic_game_info(item)       
+                    game_data = self._create_basic_game_info(item)
                 if game_data:
                     games.append(game_data)
         return games
 
-    async def _get_multiple_app_details(self, 
-        appids: List[int], 
-        session: aiohttp.ClientSession, 
+    async def _get_multiple_app_details(self,
+        appids: List[int],
+        session: aiohttp.ClientSession,
         max_concurrent: int = 5) -> Dict[int, Optional[Dict]]:
         """Параллельное получение детальной информации с лимитом одновременных запросов"""
         if not appids:
             return {}
-        
         semaphore = asyncio.Semaphore(max_concurrent)
-        
         async def bounded_get_app_details(appid: int) -> tuple[int, Optional[Dict]]:
             async with semaphore:
                 try:
@@ -129,10 +127,8 @@ class SteamDataService:
                 except Exception as e:
                     logger.error(f"Error: получение результатов для {appid}: {e}")
                     return appid, None
-                
         tasks = [bounded_get_app_details(appid) for appid in appids]
         results = await asyncio.gather(*tasks, return_exceptions=False)
-
         detailed_infos = {}
         for appid, result in results:
             detailed_infos[appid] = result
@@ -176,7 +172,6 @@ class SteamDataService:
                     else:
                         logger.error(f"Steam API error: {response.status}")
                         return []
-                    
             except aiohttp.ClientError as e:
                 raise SteamNetworkError(f"Network error: {e}")
             except SteamServiceError:
@@ -203,12 +198,11 @@ class SteamDataService:
                 for item in data[category]['items']:
                     if len(appids) >= 20: # максимум 20 игры
                         break
-                    
                     appid = item.get('id') or item.get('appid')
                     if appid:
                         appids.append(appid)
                         items_map[appid] = item
-
+        
         # Параллельные запросы для всех игр
         detailed_infos = await self._get_multiple_app_details(appids, session, max_concurrent=3)
         for appid, detailed_info in detailed_infos.items():
@@ -217,7 +211,7 @@ class SteamDataService:
                 game_data = await self._build_game_data(detailed_info, item, appid)
             else:
                 game_data = self._create_basic_game_info(item)
-            
+                
             if game_data:
                 games.append(game_data)
         return games[:20]

@@ -108,4 +108,3 @@ async def shutdown_event():
     if hasattr(steam_service, '_session') and steam_service._session:
         await steam_service._session.close()
         logger.info("Steam service session closed")
-        

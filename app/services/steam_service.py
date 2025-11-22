@@ -111,10 +111,12 @@ class SteamDataService:
                     games.append(game_data)
         return games
 
-    async def _get_multiple_app_details(self,
-    appids: List[int],
-    session: aiohttp.ClientSession,
-    max_concurrent: int = 5) -> Dict[int, Optional[Dict]]:
+    async def _get_multiple_app_details(
+        self,
+        appids: List[int],
+        session: aiohttp.ClientSession,
+        max_concurrent: int = 5
+    ) -> Dict[int, Optional[Dict]]:
         """Параллельное получение детальной информации с лимитом одновременных запросов"""
         if not appids:
             return {}

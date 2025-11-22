@@ -1,3 +1,4 @@
+import os
 from fastapi import APIRouter, Request, Depends, Query, HTTPException
 from fastapi.responses import HTMLResponse, JSONResponse
 from fastapi.templating import Jinja2Templates
@@ -13,9 +14,39 @@ router = APIRouter()
 templates = Jinja2Templates(directory="app/templates")
 logger = logging.getLogger(__name__)
 
-# Инициализация сервиса
-steam_service = SteamDataService("79DCEEEC80EB29431B88CA479CA11E56")
+def read_steam_key():
+    """Чтение Steam API ключа из файла"""
+    try:
+        # Путь к файлу с ключом
+        key_path = os.path.join(os.path.dirname(__file__), '..', '..', 'steam_key.txt')
+        key_path = os.path.abspath(key_path)
+        
+        with open(key_path, 'r', encoding='utf-8') as f:
+            key = f.read().strip()
+            
+        if not key:
+            raise ValueError("Файл с ключем Steam пуст")    
+        return key
+        
+    except FileNotFoundError:
+        logger.error("Файл с ключем Steam не найден: steam_key.txt")
+        raise
+    except Exception as e:
+        logger.error(f"Ошибка чтения файла: {e}")
+        raise
 
+def get_steam_service():
+    """Фабрика для создания SteamDataService с ключом из файла"""
+    try:
+        steam_key = read_steam_key()
+        return SteamDataService(steam_key)
+    except Exception as e:
+        logger.error(f"Ошибка инициализации Steam сервиса: {e}")
+        # Возвращаем сервис без ключа в случае ошибки
+        return SteamDataService(None)
+
+# Инициализация сервиса с ключом из файла
+steam_service = get_steam_service()
 
 @router.get("/search", response_class=HTMLResponse)
 async def search_page(request: Request, user: User = Depends(get_current_user)):
@@ -70,3 +101,11 @@ async def get_exchange_rates():
         logger.error("Error fetching exchange rates")
         # Возвращает примерные курсы в случае ошибки
         return {"USD": 90.0, "EUR": 98.0}
+
+
+@router.on_event("shutdown")
+async def shutdown_event():
+    """Закрытие сессии при завершении работы"""
+    if hasattr(steam_service, '_session') and steam_service._session:
+        await steam_service._session.close()
+        logger.info("Steam service session closed")

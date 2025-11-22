@@ -1,10 +1,27 @@
+import asyncio
 import aiohttp
 import logging
 from typing import List, Dict, Optional
-
+from contextlib import asynccontextmanager
 
 logger = logging.getLogger(__name__)
 
+
+class SteamServiceError(Exception):
+    """Базовая ошибка Steam сервиса"""
+    pass
+
+class SteamRateLimitError(SteamServiceError):
+    """Превышены лимиты запросов к Steam"""
+    pass
+
+class SteamAuthError(SteamServiceError):
+    """Ошибка аутентификации с Steam API"""
+    pass
+
+class SteamNetworkError(SteamServiceError):
+    """Ошибка при обращении к Steam"""
+    pass
 
 class SteamDataService:
     def __init__(self, api_key: str = None):
@@ -14,42 +31,111 @@ class SteamDataService:
         self.search_url = "https://store.steampowered.com/api/storesearch"
         self.price_formatter = PriceFormatter()
 
+    async def __aenter__(self):
+        """Запуск сессии"""
+        self._session = aiohttp.ClientSession()
+        return self
+
+    async def __aexit__(self, exc_type, exc_val, exc_tb):
+        """Окончание сессии"""
+        if self._session:
+            await self._session.close()
+
+    @asynccontextmanager
+    async def get_session(self):
+        """Контекстный менеджер для сессии"""
+        if self._session is None:
+            async with aiohttp.ClientSession() as session:
+                self._session = session
+                yield session
+        else:
+            yield self._session
+
     async def search_games(self, query: str) -> List[Dict]:
         """Поиск игр по названию в Steam"""
-        try:
-            async with aiohttp.ClientSession() as session:
+        async with self.get_session() as session:
+            try:
                 params = {
                     'term': query,
-                    'l': 'russian',
+                    'l': 'russian', 
                     'cc': 'ru'
                 }
 
                 async with session.get(self.search_url, params=params) as response:
                     if response.status == 200:
                         data = await response.json()
-                        return await self._parse_search_results(data)
+                        return await self._parse_search_results(data, session)
+                    elif response.status == 429:
+                        raise SteamRateLimitError("Steam API rate limit exceeded")
+                    elif response.status == 401:
+                        raise SteamAuthError("Steam API authentication failed")
                     else:
                         logger.error(f"Steam search API error: {response.status}")
                         return []
-        except Exception:
-            logger.error("Error searching games")
-            return []
+                        
+            except aiohttp.ClientError as e:
+                raise SteamNetworkError(f"Network error: {e}") from e
+            except SteamServiceError:
+                raise
+            except Exception as e:
+                return []
 
-    async def _parse_search_results(self, data: Dict) -> List[Dict]:
+    async def _parse_search_results(self, data: Dict, session: aiohttp.ClientSession) -> List[Dict]:
         """Обработка результатов поиска"""
         games = []
 
         if 'items' in data:
+            # Собирает все appid
+            appids = []
+            items_map = {}
+            
             for item in data['items']:
-                # ограничение на 20 игр
-                if len(games) >= 20:
+                if len(appids) >= 20:  # ограничение на 20 игр
                     break
+                appid = item.get('id')
+                if appid:
+                    appids.append(appid)
+                    items_map[appid] = item
 
-                game_data = await self._extract_game_from_search(item)
+            # Параллельные запросы для всех игр
+            detailed_infos = await self._get_multiple_app_details(appids, session, max_concurrent=3)
+            
+            for appid, detailed_info in detailed_infos.items():
+                item = items_map[appid]
+                if detailed_info:
+                    game_data = await self._build_game_data(detailed_info, item, appid)
+                else:
+                    game_data = self._create_basic_game_info(item)
+                
                 if game_data:
                     games.append(game_data)
-
         return games
+
+    async def _get_multiple_app_details(self, appids: List[int], session: aiohttp.ClientSession,max_concurrent: int = 5) -> Dict[int, Optional[Dict]]:
+        """Параллельное получение детальной информации с лимитом одновременных запросов"""
+        if not appids:
+            return {}
+
+        semaphore = asyncio.Semaphore(max_concurrent)
+        
+        async def bounded_get_app_details(appid: int) -> tuple[int, Optional[Dict]]:
+            async with semaphore:
+                try:
+                    result = await self._get_app_details(appid, session)
+                    return appid, result
+                except Exception as e:
+                    logger.error(f"Error: получение результатов для {appid}: {e}")
+                    return appid, None
+
+        tasks = [bounded_get_app_details(appid) for appid in appids]
+        results = await asyncio.gather(*tasks, return_exceptions=False)
+        
+        detailed_infos = {}
+        for appid, result in results:
+            detailed_infos[appid] = result
+
+        return detailed_infos
+
 
     def _create_basic_game_info(self, item: Dict) -> Optional[Dict]:
         """Базовая информация об игре"""
@@ -75,22 +161,32 @@ class SteamDataService:
 
     async def get_featured_games(self) -> List[Dict]:
         """Получение популярных игр с главной страницы Steam"""
-        try:
-            async with aiohttp.ClientSession() as session:
+        async with self.get_session() as session:
+            try:
                 async with session.get(self.featured_url) as response:
                     if response.status == 200:
                         data = await response.json()
-                        return await self._parse_featured_games(data)
+                        return await self._parse_featured_games(data, session)
+                    elif response.status == 429:
+                        raise SteamRateLimitError("Steam API rate limit exceeded")
+                    elif response.status == 401:
+                        raise SteamAuthError("Steam API authentication failed")
                     else:
                         logger.error(f"Steam API error: {response.status}")
                         return []
-        except Exception:
-            logger.error("Error fetching featured games")
-            return []
+                        
+            except aiohttp.ClientError as e:
+                raise SteamNetworkError(f"Network error: {e}") from e
+            except SteamServiceError:
+                raise
+            except Exception as e:
+                return []
 
-    async def _parse_featured_games(self, data: Dict) -> List[Dict]:
+    async def _parse_featured_games(self, data: Dict, session: aiohttp.ClientSession) -> List[Dict]:
         """Парсинг данных из featured categories"""
         games = []
+        appids = []
+        items_map = {}
 
         # Категории игр
         featured_categories = [
@@ -103,15 +199,27 @@ class SteamDataService:
         for category in featured_categories:
             if category in data and 'items' in data[category]:
                 for item in data[category]['items']:
-                    # максимум 24 игры
-                    if len(games) >= 24:
+                    if len(appids) >= 20:  # максимум 20 игры
                         break
+                    
+                    appid = item.get('id') or item.get('appid')
+                    if appid:
+                        appids.append(appid)
+                        items_map[appid] = item
 
-                    game_data = await self._extract_game_info(item)
-                    if game_data:
-                        games.append(game_data)
-
-        return games[:24]
+        # Параллельные запросы для всех игр
+        detailed_infos = await self._get_multiple_app_details(appids, session, max_concurrent=3)
+        
+        for appid, detailed_info in detailed_infos.items():
+            item = items_map[appid]
+            if detailed_info:
+                game_data = await self._build_game_data(detailed_info, item, appid)
+            else:
+                game_data = self._create_basic_game_info(item)   
+            
+            if game_data:
+                games.append(game_data)
+        return games[:20]
 
     async def _extract_game_info(self, item: Dict) -> Optional[Dict]:
         """Извлечение информации об игре из элемента"""
@@ -177,22 +285,29 @@ class SteamDataService:
             "type": detailed_info.get('type', 'game')
         }
 
-    async def _get_app_details(self, appid: int) -> Optional[Dict]:
+    async def _get_app_details(self, appid: int, session: aiohttp.ClientSession) -> Optional[Dict]:
         """Получение детальной информации об игре"""
         try:
-            async with aiohttp.ClientSession() as session:
-                url = f"{self.base_url}/appdetails"
-                params = {'appids': appid, 'l': 'russian'}
+            url = f"{self.base_url}/appdetails"
+            params = {'appids': appid, 'l': 'russian'}
 
-                async with session.get(url, params=params) as response:
-                    if response.status == 200:
-                        data = await response.json()
-                        app_data = data.get(str(appid), {})
-                        if app_data.get('success'):
-                            return app_data.get('data')
-            return None
-        except Exception:
-            logger.error(f"Error getting app details for {appid}")
+            async with session.get(url, params=params) as response:
+                if response.status == 200:
+                    data = await response.json()
+                    app_data = data.get(str(appid), {})
+                    if app_data.get('success'):
+                        return app_data.get('data')
+                elif response.status == 429:
+                    raise SteamRateLimitError(f"Rate limit for app {appid}")
+                elif response.status == 401:
+                    raise SteamAuthError(f"Auth error for app {appid}")
+                return None
+                
+        except aiohttp.ClientError as e:
+            raise SteamNetworkError(f"Network error for app {appid}: {e}") from e
+        except SteamServiceError:
+            raise
+        except Exception as e:
             return None
 
 

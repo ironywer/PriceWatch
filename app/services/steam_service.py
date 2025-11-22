@@ -11,17 +11,21 @@ class SteamServiceError(Exception):
     """Базовая ошибка Steam сервиса"""
     pass
 
+
 class SteamRateLimitError(SteamServiceError):
     """Превышены лимиты запросов к Steam"""
     pass
+
 
 class SteamAuthError(SteamServiceError):
     """Ошибка аутентификации с Steam API"""
     pass
 
+
 class SteamNetworkError(SteamServiceError):
     """Ошибка при обращении к Steam"""
     pass
+
 
 class SteamDataService:
     def __init__(self, api_key: str = None):
@@ -57,7 +61,7 @@ class SteamDataService:
             try:
                 params = {
                     'term': query,
-                    'l': 'russian', 
+                    'l': 'russian',
                     'cc': 'ru'
                 }
 
@@ -72,23 +76,22 @@ class SteamDataService:
                     else:
                         logger.error(f"Steam search API error: {response.status}")
                         return []
-                        
+                    
             except aiohttp.ClientError as e:
-                raise SteamNetworkError(f"Network error: {e}") from e
+                raise SteamNetworkError(f"Network error: {e}")
             except SteamServiceError:
                 raise
             except Exception as e:
                 return []
 
-    async def _parse_search_results(self, data: Dict, session: aiohttp.ClientSession) -> List[Dict]:
-        """Обработка результатов поиска"""
-        games = []
 
+    async def _parse_search_results(self, data: Dict, session: aiohttp.ClientSession) -> List[Dict]:
+        """Обработка результатов поиска"""    
+        games = []
         if 'items' in data:
             # Собирает все appid
             appids = []
             items_map = {}
-            
             for item in data['items']:
                 if len(appids) >= 20:  # ограничение на 20 игр
                     break
@@ -106,7 +109,7 @@ class SteamDataService:
                     game_data = await self._build_game_data(detailed_info, item, appid)
                 else:
                     game_data = self._create_basic_game_info(item)
-                
+         
                 if game_data:
                     games.append(game_data)
         return games
@@ -135,7 +138,6 @@ class SteamDataService:
             detailed_infos[appid] = result
 
         return detailed_infos
-
 
     def _create_basic_game_info(self, item: Dict) -> Optional[Dict]:
         """Базовая информация об игре"""
@@ -176,7 +178,7 @@ class SteamDataService:
                         return []
                         
             except aiohttp.ClientError as e:
-                raise SteamNetworkError(f"Network error: {e}") from e
+                raise SteamNetworkError(f"Network error: {e}")
             except SteamServiceError:
                 raise
             except Exception as e:
@@ -215,7 +217,7 @@ class SteamDataService:
             if detailed_info:
                 game_data = await self._build_game_data(detailed_info, item, appid)
             else:
-                game_data = self._create_basic_game_info(item)   
+                game_data = self._create_basic_game_info(item)
             
             if game_data:
                 games.append(game_data)
@@ -302,9 +304,9 @@ class SteamDataService:
                 elif response.status == 401:
                     raise SteamAuthError(f"Auth error for app {appid}")
                 return None
-                
+            
         except aiohttp.ClientError as e:
-            raise SteamNetworkError(f"Network error for app {appid}: {e}") from e
+            raise SteamNetworkError(f"Network error for app {appid}: {e}")
         except SteamServiceError:
             raise
         except Exception as e:

@@ -14,26 +14,24 @@ router = APIRouter()
 templates = Jinja2Templates(directory="app/templates")
 logger = logging.getLogger(__name__)
 
+
 def read_steam_key():
     """Чтение Steam API ключа из файла"""
     try:
-        # Путь к файлу с ключом
         key_path = os.path.join(os.path.dirname(__file__), '..', '..', 'steam_key.txt')
         key_path = os.path.abspath(key_path)
-        
         with open(key_path, 'r', encoding='utf-8') as f:
             key = f.read().strip()
-            
         if not key:
-            raise ValueError("Файл с ключем Steam пуст")    
+            raise ValueError("Файл с ключем Steam пуст")
         return key
-        
     except FileNotFoundError:
         logger.error("Файл с ключем Steam не найден: steam_key.txt")
         raise
     except Exception as e:
         logger.error(f"Ошибка чтения файла: {e}")
         raise
+
 
 def get_steam_service():
     """Фабрика для создания SteamDataService с ключом из файла"""
@@ -42,7 +40,6 @@ def get_steam_service():
         return SteamDataService(steam_key)
     except Exception as e:
         logger.error(f"Ошибка инициализации Steam сервиса: {e}")
-        # Возвращаем сервис без ключа в случае ошибки
         return SteamDataService(None)
 
 # Инициализация сервиса с ключом из файла
@@ -109,3 +106,4 @@ async def shutdown_event():
     if hasattr(steam_service, '_session') and steam_service._session:
         await steam_service._session.close()
         logger.info("Steam service session closed")
+        

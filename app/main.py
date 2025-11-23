@@ -6,7 +6,6 @@ from starlette.responses import JSONResponse
 from starlette.templating import Jinja2Templates
 from contextlib import asynccontextmanager
 from sqlalchemy.engine import Engine
-
 from app.db.database import Base, engine as prod_engine
 from app.routers.main import router as main_router
 from app.routers.search import router as search_router

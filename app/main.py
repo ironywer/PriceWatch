@@ -11,6 +11,8 @@ from app.routers.main import router as main_router
 from app.routers.search import router as search_router
 from app.routers.auth import router as auth_router
 from app.routers.wishlist import router as wishlist_router
+from app.services import steam_service
+
 templates = Jinja2Templates(directory="app/templates")
 
 
@@ -53,3 +55,8 @@ def create_app(engine_override: Engine | None = None) -> FastAPI:
 
 
 app = create_app()
+
+
+@app.on_event("shutdown")
+async def shutdown():
+    await steam_service.close()

@@ -154,6 +154,19 @@
         color: #1b2838;
     }
 </style>
+<script>
+    // уже имеющийся JS оставляем…
+
+    // В самом конце скрипта:
+    (function() {
+        const status = "{{ request.query_params.get('status') or '' }}";
+        const message = {{ (request.query_params.get('message') or '') | tojson }};
+        if (status && message) {
+            showToast(message, status);
+        }
+    })();
+</script>
+
 
 <!-- Конвертер валют -->
 <div class="currency-selector">
@@ -166,236 +179,250 @@
 </div>
 
 <div class="container">
-        <h1>Популярные игры в Steam</h1>
+    <h1>Популярные игры в Steam</h1>
 
-        <!-- Строка поиска -->
-        <div class="search-form">
-            <input type="text" id="searchInput" placeholder="Введите название игры для поиска...">
-            <button onclick="searchGames()">Найти</button>
-        </div>
-        
-        <!-- Стена для вывода игр -->
-        <div id="results" class="games-grid">
-            {% if featured_games %}
-                {% for game in featured_games %}
-                <div class="game-card" data-original-price='{{ game.price | tojson | safe }}'>
-                    <img src="{{ game.image }}" alt="{{ game.name }}" class="game-image" 
-                         onerror="this.src='https://via.placeholder.com/460x215/1b2838/ffffff?text=No+Image'">
-                    <div class="game-info">
-                        <h3 class="game-title">{{ game.name }}</h3>
-                        <p class="game-publisher">{{ game.publisher }}</p>
-                        <div class="game-price">{{ game.price | safe }}</div>
-                        <button class="add-button">Добавить</button>
-                    </div>
-                </div>
-                {% endfor %}
-            {% else %}
-                <div class="loading">Загрузка игр...</div>
-            {% endif %}
-        </div>
+    <!-- Строка поиска -->
+    <div class="search-form">
+        <input type="text" id="searchInput" placeholder="Введите название игры для поиска...">
+        <button onclick="searchGames()">Найти</button>
     </div>
 
-    <script>
-        // Объект для хранения курсов валют
-        let exchangeRates = {RUB: 1, USD: 90, EUR: 98 };
+    <!-- Стена для вывода игр -->
+    <div id="results" class="games-grid">
+        {% if featured_games %}
+        {% for game in featured_games %}
+        <div class="game-card" data-original-price='{{ game.price | tojson | safe }}'>
+            <img src="{{ game.image }}" alt="{{ game.name }}" class="game-image"
+                 onerror="this.src='https://via.placeholder.com/460x215/1b2838/ffffff?text=No+Image'">
+            <div class="game-info">
+                <h3 class="game-title">{{ game.name }}</h3>
+                <p class="game-publisher">{{ game.publisher }}</p>
+                <div class="game-price">{{ game.price | safe }}</div>
+                {% if game.appid in wishlist_app_ids %}
+                <form method="post" action="/wishlist/{{ wishlist_by_appid[game.appid] }}/delete">
+                    <button type="submit" class="add-button">Удалить</button>
+                </form>
+                {% else %}
+                <form method="post" action="/wishlist/add">
+                    <input type="hidden" name="steam_app_id" value="{{ game.appid }}">
+                    <button type="submit" class="add-button">Добавить</button>
+                </form>
+                {% endif %}
+            </div>
+        </div>
+        {% endfor %}
+        {% else %}
+        <div class="loading">Загрузка игр...</div>
+        {% endif %}
+    </div>
+</div>
 
-        let currentCurrency = 'RUB';
+<script>
+    // Объект для хранения курсов валют
+    let exchangeRates = {RUB: 1, USD: 90, EUR: 98 };
 
-        //Получение курсов валют с ЦБ РФ, они актуальны только один час и хранятся в localStorage
-        async function fetchExchangeRates() {
-            try {
-                const savedRates = localStorage.getItem('exchangeRates');                //есть ли сохраненные курсы в localStorage
-                const savedTimestamp = localStorage.getItem('exchangeRatesTimestamp');
-                
-                if (savedRates && savedTimestamp) {
-                    const oneHour = 60 * 60 * 1000;
-                    if (Date.now() - parseInt(savedTimestamp) < oneHour) {
-                        exchangeRates = JSON.parse(savedRates);
-                        console.log('Используем сохраненные курсы валют');
-                        return;
-                    }
-                }
-                
-                
-                const response = await fetch('/api/exchange-rates');// Если нет сохраненных курсов или они устарели, загружает новые
-                const rates = await response.json();
-                
-                if (rates.USD && rates.EUR) {
-                    exchangeRates.USD = rates.USD;
-                    exchangeRates.EUR = rates.EUR;
-                    
-                    // Сохраняет курсы валют и время получения в localStorage
-                    localStorage.setItem('exchangeRates', JSON.stringify(exchangeRates));
-                    localStorage.setItem('exchangeRatesTimestamp', Date.now().toString());
-                    console.log('Курсы валют обновлены и сохранены');
-                }
-            } 
-            catch (error) {
-                // Использует сохраненные курсы даже если они устарели
-                const savedRates = localStorage.getItem('exchangeRates');
-                if (savedRates) {
+    let currentCurrency = 'RUB';
+
+    //Получение курсов валют с ЦБ РФ, они актуальны только один час и хранятся в localStorage
+    async function fetchExchangeRates() {
+        try {
+            const savedRates = localStorage.getItem('exchangeRates');                //есть ли сохраненные курсы в localStorage
+            const savedTimestamp = localStorage.getItem('exchangeRatesTimestamp');
+
+            if (savedRates && savedTimestamp) {
+                const oneHour = 60 * 60 * 1000;
+                if (Date.now() - parseInt(savedTimestamp) < oneHour) {
                     exchangeRates = JSON.parse(savedRates);
+                    console.log('Используем сохраненные курсы валют');
+                    return;
                 }
             }
-        }
 
-        //Конвертация цены со скидкой
-        function convertPrice(priceText, toCurrency) {
-            if (priceText.includes(getCurrencySymbol(toCurrency))) {
-                return priceText;
-            }
 
-            if (priceText.includes('Бесплатно') || priceText.includes('Free')) {
-                return 'Бесплатно';
-            }
+            const response = await fetch('/api/exchange-rates');// Если нет сохраненных курсов или они устарели, загружает новые
+            const rates = await response.json();
 
-            // Проверяет есть ли скидка
-            if (priceText.includes('<s>')) {
-                return convertDiscountedPrice(priceText, toCurrency);
-            } else {
-                return convertSimplePrice(priceText, toCurrency);
+            if (rates.USD && rates.EUR) {
+                exchangeRates.USD = rates.USD;
+                exchangeRates.EUR = rates.EUR;
+
+                // Сохраняет курсы валют и время получения в localStorage
+                localStorage.setItem('exchangeRates', JSON.stringify(exchangeRates));
+                localStorage.setItem('exchangeRatesTimestamp', Date.now().toString());
+                console.log('Курсы валют обновлены и сохранены');
             }
         }
-
-        //Конвертация цены со скидкой
-        function convertDiscountedPrice(priceText, toCurrency) {
-            // извлечение цен из строки
-            const priceMatch = priceText.match(/<s>([\d.,]+)\s*[A-Za-zа-яё]+\.?<\/s>\s*([\d.,]+)\s*[A-Za-zа-яё]+\.?\s*(.*)/);
-            
-            if (priceMatch) {
-                const oldPriceText = priceMatch[1];
-                const newPriceText = priceMatch[2];
-                const discountInfo = priceMatch[3]; //Скидка
-
-                const originalCurrency = detectCurrency(priceText);
-            
-                // Конвертация цен
-                const oldPrice = parseFloat(oldPriceText.replace(',', '.'));
-                const newPrice = parseFloat(newPriceText.replace(',', '.'));
-                
-                const convertedOldPrice = convertAmount(oldPrice, originalCurrency, toCurrency);
-                const convertedNewPrice = convertAmount(newPrice, originalCurrency, toCurrency);
-                
-                return `<s>${convertedOldPrice} ${getCurrencySymbol(toCurrency)}</s> ${convertedNewPrice} ${getCurrencySymbol(toCurrency)} ${discountInfo}`;
+        catch (error) {
+            // Использует сохраненные курсы даже если они устарели
+            const savedRates = localStorage.getItem('exchangeRates');
+            if (savedRates) {
+                exchangeRates = JSON.parse(savedRates);
             }
-            
+        }
+    }
+
+    //Конвертация цены со скидкой
+    function convertPrice(priceText, toCurrency) {
+        if (priceText.includes(getCurrencySymbol(toCurrency))) {
             return priceText;
         }
 
-        // Функция для конвертации цены без скидки
-        function convertSimplePrice(priceText, toCurrency) {
+        if (priceText.includes('Бесплатно') || priceText.includes('Free')) {
+            return 'Бесплатно';
+        }
+
+        // Проверяет есть ли скидка
+        if (priceText.includes('<s>')) {
+            return convertDiscountedPrice(priceText, toCurrency);
+        } else {
+            return convertSimplePrice(priceText, toCurrency);
+        }
+    }
+
+    //Конвертация цены со скидкой
+    function convertDiscountedPrice(priceText, toCurrency) {
+        // извлечение цен из строки
+        const priceMatch = priceText.match(/<s>([\d.,]+)\s*[A-Za-zа-яё]+\.?<\/s>\s*([\d.,]+)\s*[A-Za-zа-яё]+\.?\s*(.*)/);
+
+        if (priceMatch) {
+            const oldPriceText = priceMatch[1];
+            const newPriceText = priceMatch[2];
+            const discountInfo = priceMatch[3]; //Скидка
+
             const originalCurrency = detectCurrency(priceText);
-            const priceMatch = priceText.match(/([\d.,]+)/);
-            
-            if (priceMatch) {
-                const price = parseFloat(priceMatch[1].replace(',', '.'));
-                const convertedPrice = convertAmount(price, originalCurrency, toCurrency);
-                return `${convertedPrice} ${getCurrencySymbol(toCurrency)}`;
-            }
-            
-            return priceText;
+
+            // Конвертация цен
+            const oldPrice = parseFloat(oldPriceText.replace(',', '.'));
+            const newPrice = parseFloat(newPriceText.replace(',', '.'));
+
+            const convertedOldPrice = convertAmount(oldPrice, originalCurrency, toCurrency);
+            const convertedNewPrice = convertAmount(newPrice, originalCurrency, toCurrency);
+
+            return `<s>${convertedOldPrice} ${getCurrencySymbol(toCurrency)}</s> ${convertedNewPrice} ${getCurrencySymbol(toCurrency)} ${discountInfo}`;
         }
 
-        // Конвертация суммы
-        function convertAmount(amount, fromCurrency, toCurrency) {
-            if (fromCurrency === toCurrency) return amount.toFixed(2).replace('.', ',');
-            
-            //конвертация через рубли
-            const amountInRub = amount * exchangeRates[fromCurrency];
-            const convertedAmount = amountInRub / exchangeRates[toCurrency];
-            
-            return convertedAmount.toFixed(2).replace('.', ',');
+        return priceText;
+    }
+
+    // Функция для конвертации цены без скидки
+    function convertSimplePrice(priceText, toCurrency) {
+        const originalCurrency = detectCurrency(priceText);
+        const priceMatch = priceText.match(/([\d.,]+)/);
+
+        if (priceMatch) {
+            const price = parseFloat(priceMatch[1].replace(',', '.'));
+            const convertedPrice = convertAmount(price, originalCurrency, toCurrency);
+            return `${convertedPrice} ${getCurrencySymbol(toCurrency)}`;
         }
 
-        //функция для определения валюты из текста
-        function detectCurrency(priceText) {
-            if (priceText.includes('USD')) return 'USD';
-            if (priceText.includes('EUR')) return 'EUR';
-            if (priceText.includes('руб.')) return 'RUB';
-            return 'RUB';
-        }
+        return priceText;
+    }
 
-        //Функция для получения символа валюты
-        function getCurrencySymbol(currency) {
-            const symbols = {
-                'RUB': 'руб.',
-                'USD': 'USD',
-                'EUR': 'EUR'
-            };
-            return symbols[currency] || 'руб.';
-        }
+    // Конвертация суммы
+    function convertAmount(amount, fromCurrency, toCurrency) {
+        if (fromCurrency === toCurrency) return amount.toFixed(2).replace('.', ',');
 
-        // Функция для обновления всех цен на странице
-        function updateAllPrices() {
-            const gameCards = document.querySelectorAll('.game-card');
-            gameCards.forEach(card => {
-                const priceElement = card.querySelector('.game-price');
-                const originalPrice = priceElement.innerHTML;
-                const convertedPrice = convertPrice(originalPrice, currentCurrency);
-                priceElement.innerHTML = convertedPrice;
-            });
-        }
+        //конвертация через рубли
+        const amountInRub = amount * exchangeRates[fromCurrency];
+        const convertedAmount = amountInRub / exchangeRates[toCurrency];
 
-        //Обработчик выбора валюты
-        document.getElementById('currencySelect').addEventListener('change', function(e) {
-            currentCurrency = e.target.value;
-            updateAllPrices();
+        return convertedAmount.toFixed(2).replace('.', ',');
+    }
+
+    //функция для определения валюты из текста
+    function detectCurrency(priceText) {
+        if (priceText.includes('USD')) return 'USD';
+        if (priceText.includes('EUR')) return 'EUR';
+        if (priceText.includes('руб.')) return 'RUB';
+        return 'RUB';
+    }
+
+    //Функция для получения символа валюты
+    function getCurrencySymbol(currency) {
+        const symbols = {
+            'RUB': 'руб.',
+            'USD': 'USD',
+            'EUR': 'EUR'
+        };
+        return symbols[currency] || 'руб.';
+    }
+
+    // Функция для обновления всех цен на странице
+    function updateAllPrices() {
+        const gameCards = document.querySelectorAll('.game-card');
+        gameCards.forEach(card => {
+            const priceElement = card.querySelector('.game-price');
+            const originalPrice = priceElement.innerHTML;
+            const convertedPrice = convertPrice(originalPrice, currentCurrency);
+            priceElement.innerHTML = convertedPrice;
         });
+    }
 
-        async function searchGames() {
-            const query = document.getElementById('searchInput').value;
-            if (query.length < 2) {
-                alert('Введите хотя бы 2 символа для поиска');
-                return;
-            }
-            
-            const resultsContainer = document.getElementById('results');
-            resultsContainer.innerHTML = '<div class="loading">Поиск игр...</div>';
-            
-            try {
-                const response = await fetch(`/api/search?query=${encodeURIComponent(query)}`);
-                const games = await response.json();
-                displayGames(games);
-            } catch (error) {
-                resultsContainer.innerHTML = '<div class="loading">Ошибка при поиске</div>';
-            }
+    //Обработчик выбора валюты
+    document.getElementById('currencySelect').addEventListener('change', function(e) {
+        currentCurrency = e.target.value;
+        updateAllPrices();
+    });
+
+    async function searchGames() {
+        const query = document.getElementById('searchInput').value;
+        if (query.length < 2) {
+            alert('Введите хотя бы 2 символа для поиска');
+            return;
         }
 
-        function displayGames(games) {
-            const container = document.getElementById('results');
-            
-            if (games.length === 0) {
-                container.innerHTML = '<div class="loading">Игры не найдены</div>';
-                return;
-            }
-            
-            container.innerHTML = games.map(game => `
-                <div class="game-card">
-                    <img src="${game.image}" alt="${game.name}" class="game-image"
-                        onerror="this.src='https://via.placeholder.com/460x215/1b2838/ffffff?text=No+Image'">
-                    <div class="game-info">
-                        <h3 class="game-title">${game.name}</h3>
-                        <p class="game-publisher">${game.publisher}</p>
-                        <div class="game-price">${game.price}</div>
-                        <button class="add-button">Добавить</button>
-                    </div>
+        const resultsContainer = document.getElementById('results');
+        resultsContainer.innerHTML = '<div class="loading">Поиск игр...</div>';
+
+        try {
+            const response = await fetch(`/api/search?query=${encodeURIComponent(query)}`);
+            const games = await response.json();
+            displayGames(games);
+        } catch (error) {
+            resultsContainer.innerHTML = '<div class="loading">Ошибка при поиске</div>';
+        }
+    }
+
+    function displayGames(games) {
+        const container = document.getElementById('results');
+
+        if (games.length === 0) {
+            container.innerHTML = '<div class="loading">Игры не найдены</div>';
+            return;
+        }
+
+        container.innerHTML = games.map(game => `
+            <div class="game-card">
+                <img src="${game.image}" alt="${game.name}" class="game-image"
+                    onerror="this.src='https://via.placeholder.com/460x215/1b2838/ffffff?text=No+Image'">
+                <div class="game-info">
+                    <h3 class="game-title">${game.name}</h3>
+                    <p class="game-publisher">${game.publisher}</p>
+                    <div class="game-price">${game.price}</div>
+
+                    <form method="post" action="/wishlist/add">
+                        <input type="hidden" name="steam_app_id" value="${game.appid}">
+                        <button class="add-button" type="submit">Добавить</button>
+                    </form>
                 </div>
-            `).join('');
-            
-            // Обновление цен
-            updateAllPrices();
+            </div>
+        `).join('');
+
+        // Обновляем цены после перерисовки
+        updateAllPrices();
+    }
+
+
+    // Поиск при нажатии Enter
+    document.getElementById('searchInput').addEventListener('keypress', function(e) {
+        if (e.key === 'Enter') {
+            searchGames();
         }
-        
-        // Поиск при нажатии Enter
-        document.getElementById('searchInput').addEventListener('keypress', function(e) {
-            if (e.key === 'Enter') {
-                searchGames();
-            }
-        });
-        
-        document.getElementById('searchInput').focus();
-        
-        // Загружает курсы валют при загрузке страницы
-        fetchExchangeRates();
-    </script>
+    });
+
+    document.getElementById('searchInput').focus();
+
+    // Загружает курсы валют при загрузке страницы
+    fetchExchangeRates();
+</script>
 {% endblock %}

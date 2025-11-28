@@ -28,10 +28,13 @@ def get_current_user(request: Request, db: Session = Depends(get_db)) -> User:
         raise credentials_exc
     try:
         payload = decode_access_token(token)
-        user_id = payload.get("sub")
-        if not user_id:
-            raise credentials_exc
+        user_id_raw = payload.get("sub")
     except JWTError:
+        raise credentials_exc
+
+    try:
+        user_id = int(user_id_raw)
+    except (TypeError, ValueError):
         raise credentials_exc
 
     user = db.query(User).get(int(user_id))

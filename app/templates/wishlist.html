@@ -119,13 +119,6 @@
         text-align: center;
     }
 </style>
-{% if request.query_params.get('status') %}
-  {% set status = request.query_params.get('status') %}
-  {% set message = request.query_params.get('message') %}
-  <div class="alert {{ 'alert-success' if status == 'ok' else 'alert-danger' }}">
-      {{ message }}
-  </div>
-{% endif %}
 
 <div class="container">
     <h1>Ваш вишлист</h1>
@@ -163,4 +156,18 @@
       <p class="empty-text">Ваш вишлист пока пуст. Добавьте игру со страницы поиска.</p>
     {% endif %}
 </div>
+
+{% if request.query_params.get('status') %}
+<script>
+    (function() {
+        const status = "{{ request.query_params.get('status') or '' }}";
+        const message = {{ (request.query_params.get('message') or '') | tojson }};
+        if (status && message) {
+            // status можно пробрасывать как 'ok' / 'error', если showToast это использует
+            showToast(message, status);
+        }
+    })();
+</script>
+{% endif %}
+
 {% endblock %}

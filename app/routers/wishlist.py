@@ -62,7 +62,6 @@ async def view_wishlist(
     )
 
 
-
 @router.post("/add")
 async def add_game(
         request: Request,

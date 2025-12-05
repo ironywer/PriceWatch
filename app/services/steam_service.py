@@ -34,10 +34,25 @@ class SteamDataService:
         self.featured_url = "https://store.steampowered.com/api/featuredcategories"
         self.search_url = "https://store.steampowered.com/api/storesearch"
         self.price_formatter = PriceFormatter()
+        self._session = None
 
     async def __aenter__(self):
         """Запуск сессии"""
-        self._session = aiohttp.ClientSession()
+        self._session = aiohttp.ClientSession(
+            headers={
+                "User-Agent": (
+                    "Mozilla/5.0 (Windows NT 10.0; Win64; x64) "
+                    "AppleWebKit/537.36 (KHTML, like Gecko) "
+                    "Chrome/121.0.0.0 Safari/537.36"
+                )
+            },
+            cookies={
+                "mature_content": "1",
+                "birthtime": "568022401",
+                "lastagecheckage": "1-January-1988",
+                "steamCountry": "RU|1234567890123",
+            }
+        )
         return self
 
     async def __aexit__(self, exc_type, exc_val, exc_tb):
@@ -47,13 +62,16 @@ class SteamDataService:
 
     @asynccontextmanager
     async def get_session(self):
-        """Контекстный менеджер для сессии"""
-        if self._session is None:
-            async with aiohttp.ClientSession() as session:
-                self._session = session
-                yield session
-        else:
+        if self._session is None or self._session.closed:
+            self._session = aiohttp.ClientSession()
+        try:
             yield self._session
+        finally:
+            pass
+
+    async def close(self):
+        if self._session and not self._session.closed:
+            await self._session.close()
 
     async def search_games(self, query: str) -> List[Dict]:
         """Поиск игр по названию в Steam"""
@@ -82,6 +100,7 @@ class SteamDataService:
             except SteamServiceError:
                 raise
             except Exception:
+                logger.exception("Unexpected error in search_games")
                 return []
 
     async def _parse_search_results(self, data: Dict, session: aiohttp.ClientSession) -> List[Dict]:
@@ -95,7 +114,8 @@ class SteamDataService:
                 if len(appids) >= 20:  # ограничение на 20 игр
                     break
                 appid = item.get('id')
-                if appid:
+                price = item.get('price')
+                if appid and price:
                     appids.append(appid)
                     items_map[appid] = item
 
@@ -112,10 +132,10 @@ class SteamDataService:
         return games
 
     async def _get_multiple_app_details(
-        self,
-        appids: List[int],
-        session: aiohttp.ClientSession,
-        max_concurrent: int = 5
+            self,
+            appids: List[int],
+            session: aiohttp.ClientSession,
+            max_concurrent: int = 5
     ) -> Dict[int, Optional[Dict]]:
         """Параллельное получение детальной информации с лимитом одновременных запросов"""
         if not appids:
@@ -213,10 +233,11 @@ class SteamDataService:
         detailed_infos = await self._get_multiple_app_details(appids, session, max_concurrent=3)
         for appid, detailed_info in detailed_infos.items():
             item = items_map[appid]
+            game_data = False
             if detailed_info:
                 game_data = await self._build_game_data(detailed_info, item, appid)
-            else:
-                game_data = self._create_basic_game_info(item)
+            # else:
+            #     game_data = self._create_basic_game_info(item)
 
             if game_data:
                 games.append(game_data)

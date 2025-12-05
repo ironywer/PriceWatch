@@ -2,13 +2,14 @@ import os
 from fastapi import APIRouter, Request, Depends, Query, HTTPException
 from fastapi.responses import HTMLResponse, JSONResponse
 from fastapi.templating import Jinja2Templates
+from sqlalchemy.orm import Session
+from app.db.database import get_db
 from app.services.steam_service import SteamDataService
 from app.deps import get_current_user
-from app.models import User
+from app.models import User, Wishlist
 import requests
 import xml.etree.ElementTree as ET
 import logging
-
 
 router = APIRouter()
 templates = Jinja2Templates(directory="app/templates")
@@ -48,21 +49,39 @@ steam_service = get_steam_service()
 
 
 @router.get("/search", response_class=HTMLResponse)
-async def search_page(request: Request, user: User = Depends(get_current_user)):
+async def search_page(request: Request, db: Session = Depends(get_db), user: User = Depends(get_current_user)):
     """Главная страница поиска - показывает популярные игры"""
     try:
         featured_games = await steam_service.get_featured_games()
+        # Загружаем вишлист пользователя
+        wishlist_items = (
+            db.query(Wishlist)
+            .filter(Wishlist.owner_id == user.id)
+            .all()
+        )
+
+        # Множество appid, чтобы быстро проверять "в вишлисте ли игра"
+        wishlist_app_ids = {w.steam_app_id for w in wishlist_items}
+
+        # Для удаления нужен id записи
+        wishlist_by_appid = {w.steam_app_id: w.id for w in wishlist_items}
+
         return templates.TemplateResponse("search.html", {
             "request": request,
             "featured_games": featured_games,
-            "user": user
+            "user": user,
+            "wishlist_app_ids": wishlist_app_ids,
+            "wishlist_by_appid": wishlist_by_appid,
         })
+
     except Exception:
         logger.error("Error fetching featured games")
         return templates.TemplateResponse("search.html", {
             "request": request,
             "featured_games": [],
-            "user": user
+            "user": user,
+            "wishlist_app_ids": set(),
+            "wishlist_by_appid": {},
         })
 
 

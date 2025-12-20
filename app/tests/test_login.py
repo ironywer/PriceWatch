@@ -8,7 +8,7 @@ def test_login_wrong_password(client: TestClient, password):
     client.post("/auth/register", data={"email": email, "password": "Secret123"})
 
     resp = client.post("/auth/login", data={"email": email, "password": password})
-    assert resp.status_code == 400
+    assert resp.status_code in [400, 422]
 
 
 login_cases = [

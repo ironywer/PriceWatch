@@ -1,6 +1,7 @@
 import random
 from typing import List, Dict
 
+
 class GameGenerator:
     """Генератор игр"""
 

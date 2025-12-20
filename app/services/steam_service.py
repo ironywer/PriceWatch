@@ -1,31 +1,17 @@
 import asyncio
 import aiohttp
 import logging
+from enum import Enum
+from dataclasses import dataclass
+from datetime import datetime
 from typing import List, Dict, Optional
 from contextlib import asynccontextmanager
 
+# Импорт генератора игр
+from app.services.generator_games import GameGenerator
+
+
 logger = logging.getLogger(__name__)
-
-
-class SteamServiceError(Exception):
-    """Базовая ошибка Steam сервиса"""
-    pass
-
-
-class SteamRateLimitError(SteamServiceError):
-    """Превышены лимиты запросов к Steam"""
-    pass
-
-
-class SteamAuthError(SteamServiceError):
-    """Ошибка аутентификации с Steam API"""
-    pass
-
-
-class SteamNetworkError(SteamServiceError):
-    """Ошибка при обращении к Steam"""
-    pass
-
 
 class SteamDataService:
     def __init__(self, api_key: str = None):
@@ -34,6 +20,7 @@ class SteamDataService:
         self.featured_url = "https://store.steampowered.com/api/featuredcategories"
         self.search_url = "https://store.steampowered.com/api/storesearch"
         self.price_formatter = PriceFormatter()
+        self.use_fallback = False  # Флаг для генаратора игр
         self._session = None
 
     async def __aenter__(self):
@@ -87,18 +74,9 @@ class SteamDataService:
                     if response.status == 200:
                         data = await response.json()
                         return await self._parse_search_results(data, session)
-                    elif response.status == 429:
-                        raise SteamRateLimitError("Steam API rate limit exceeded")
-                    elif response.status == 401:
-                        raise SteamAuthError("Steam API authentication failed")
                     else:
                         logger.error(f"Steam search API error: {response.status}")
                         return []
-
-            except aiohttp.ClientError as e:
-                raise SteamNetworkError(f"Network error: {e}")
-            except SteamServiceError:
-                raise
             except Exception:
                 logger.exception("Unexpected error in search_games")
                 return []
@@ -107,7 +85,6 @@ class SteamDataService:
         """Обработка результатов поиска"""
         games = []
         if 'items' in data:
-            # Собирает все appid
             appids = []
             items_map = {}
             for item in data['items']:
@@ -119,7 +96,7 @@ class SteamDataService:
                     appids.append(appid)
                     items_map[appid] = item
 
-            # Параллельные запросы для всех игр
+            # Параллельные запросы
             detailed_infos = await self._get_multiple_app_details(appids, session, max_concurrent=3)
             for appid, detailed_info in detailed_infos.items():
                 item = items_map[appid]
@@ -137,7 +114,7 @@ class SteamDataService:
             session: aiohttp.ClientSession,
             max_concurrent: int = 5
     ) -> Dict[int, Optional[Dict]]:
-        """Параллельное получение детальной информации с лимитом одновременных запросов"""
+        """Параллельное получение детальной информации"""
         if not appids:
             return {}
 
@@ -186,22 +163,22 @@ class SteamDataService:
         """Получение популярных игр с главной страницы Steam"""
         async with self.get_session() as session:
             try:
+                if self.use_fallback:
+                    logger.info("Используется генератор популярных игр")
+                    return GameGenerator.get_featured_games()
+
                 async with session.get(self.featured_url) as response:
                     if response.status == 200:
                         data = await response.json()
                         return await self._parse_featured_games(data, session)
-                    elif response.status == 429:
-                        raise SteamRateLimitError("Steam API rate limit exceeded")
-                    elif response.status == 401:
-                        raise SteamAuthError("Steam API authentication failed")
                     else:
                         logger.error(f"Steam API error: {response.status}")
                         return []
 
             except aiohttp.ClientError as e:
-                raise SteamNetworkError(f"Network error: {e}")
-            except SteamServiceError:
-                raise
+                logger.error(f"Error fetching featured games: {e}")
+                self.use_fallback = True
+                return GameGenerator.get_featured_games()
             except Exception:
                 return []
 
@@ -222,23 +199,19 @@ class SteamDataService:
         for category in featured_categories:
             if category in data and 'items' in data[category]:
                 for item in data[category]['items']:
-                    if len(appids) >= 20:  # максимум 20 игры
+                    if len(appids) >= 20:  # максимум 20 игр
                         break
                     appid = item.get('id') or item.get('appid')
                     if appid:
                         appids.append(appid)
                         items_map[appid] = item
 
-        # Параллельные запросы для всех игр
         detailed_infos = await self._get_multiple_app_details(appids, session, max_concurrent=3)
         for appid, detailed_info in detailed_infos.items():
             item = items_map[appid]
             game_data = False
             if detailed_info:
                 game_data = await self._build_game_data(detailed_info, item, appid)
-            # else:
-            #     game_data = self._create_basic_game_info(item)
-
             if game_data:
                 games.append(game_data)
         return games[:20]
@@ -319,15 +292,6 @@ class SteamDataService:
                     app_data = data.get(str(appid), {})
                     if app_data.get('success'):
                         return app_data.get('data')
-                elif response.status == 429:
-                    raise SteamRateLimitError(f"Rate limit for app {appid}")
-                elif response.status == 401:
-                    raise SteamAuthError(f"Auth error for app {appid}")
-                return None
-        except aiohttp.ClientError as e:
-            raise SteamNetworkError(f"Network error for app {appid}: {e}")
-        except SteamServiceError:
-            raise
         except Exception:
             return None
 

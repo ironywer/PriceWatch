@@ -1,9 +1,6 @@
 import asyncio
 import aiohttp
 import logging
-from enum import Enum
-from dataclasses import dataclass
-from datetime import datetime
 from typing import List, Dict, Optional
 from contextlib import asynccontextmanager
 
@@ -12,6 +9,7 @@ from app.services.generator_games import GameGenerator
 
 
 logger = logging.getLogger(__name__)
+
 
 class SteamDataService:
     def __init__(self, api_key: str = None):
